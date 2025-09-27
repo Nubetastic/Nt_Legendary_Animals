@@ -12,7 +12,7 @@ globalCooldown = 0 -- Cooldown for all legendary animals
 -- Initialize the script
 Citizen.CreateThread(function()
     -- Wait for player to fully load
-    Citizen.Wait(2000)
+    Wait(2000)
     
     -- Set initial values for time and weather
     currentTime = UpdateCurrentTime()
@@ -28,11 +28,11 @@ end)
 -- Main loop to check for legendary animal spawn areas
 Citizen.CreateThread(function()
     -- Wait for full initialization
-    Citizen.Wait(5000)
+    Wait(5000)
     
     -- Main loop
     while true do
-        Citizen.Wait(1000) -- Check every second
+        Wait(1000) -- Check every second
         
         -- If player is not on cooldown
         if playerState == "tracking" then

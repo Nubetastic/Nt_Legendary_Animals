@@ -73,7 +73,7 @@ function UpdateCurrentWeather()
     
     -- FALLBACK: Set a timeout to reset the flag in case the server never responds
     Citizen.CreateThread(function()
-        Citizen.Wait(10000) -- 10 second timeout
+        Wait(10000) -- 10 second timeout
         if weatherUpdateInProgress then
             weatherUpdateInProgress = false
             if Config.DebugMode then
@@ -113,13 +113,13 @@ end
 -- Initialize weather tracking
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(60000) -- Update every minute
+        Wait(60000) -- Update every minute
         UpdateCurrentWeather()
     end
 end)
 
 -- Initial weather update - reduced delay to get weather faster
 Citizen.CreateThread(function()
-    Citizen.Wait(1000) -- Short delay to ensure weathersync is initialized
+    Wait(1000) -- Short delay to ensure weathersync is initialized
     UpdateCurrentWeather()
 end)

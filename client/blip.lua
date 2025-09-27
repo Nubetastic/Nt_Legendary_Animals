@@ -21,7 +21,7 @@ AddEventHandler('nt_legendary:attachBlipToEntity', function(animalName, netId)
         Citizen.CreateThread(function()
             local attempts = 0
             while attempts < 10 and not DoesEntityExist(entity) do
-                Citizen.Wait(500)
+                Wait(500)
                 entity = NetworkGetEntityFromNetworkId(netId)
                 attempts = attempts + 1
             end
@@ -220,7 +220,7 @@ function StartBlipMonitorThread(animalName, entityId)
                 end
             end
             
-            Citizen.Wait(1000) -- Check every second
+            Wait(1000) -- Check every second
         end
         
         -- Entity no longer exists, clean up

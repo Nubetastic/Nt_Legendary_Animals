@@ -18,7 +18,7 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
     RequestModel(legendaryHash)
     local timeout = 0
     while not HasModelLoaded(legendaryHash) and timeout < 30 do
-        Citizen.Wait(100)
+        Wait(100)
         timeout = timeout + 1
     end
     
@@ -60,7 +60,7 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
         RequestModel(companionHash)
         local timeout = 0
         while not HasModelLoaded(companionHash) and timeout < 30 do
-            Citizen.Wait(100)
+            Wait(100)
             timeout = timeout + 1
         end
         
@@ -114,7 +114,7 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
     Citizen.InvokeNative(0xAD738C3085FE7E11, legendaryPed, true, true)
     
     -- Wait a moment for the entity to be fully created
-    Citizen.Wait(100)
+    Wait(100)
     
     -- Check if the entity is already networked (it should be since we created it with CreatePed)
     -- NETWORK::NETWORK_GET_ENTITY_IS_NETWORKED (0x0991549DE4D64762)
@@ -126,7 +126,7 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
         Citizen.InvokeNative(0x06FAACD625D80CAA, legendaryPed)
         
         -- Wait a moment for networking to take effect
-        Citizen.Wait(100)
+        Wait(100)
         
         -- Check again if it's networked
         isNetworked = Citizen.InvokeNative(0x0991549DE4D64762, legendaryPed)
@@ -155,7 +155,7 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
         Citizen.InvokeNative(0x299EEB23175895FC, netId, false) -- Changed to false to prevent migration
         
         -- Networking is complete
-        Citizen.Wait(500)
+        Wait(500)
         if Config.DebugMode then
             print("^2Legendary animal network ID: " .. netId .. "^7")
         end
@@ -169,7 +169,7 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
         local maxAttempts = 5
         
         while (not netId or netId == 0) and attempts < maxAttempts do
-            Citizen.Wait(500 * (attempts + 1))
+            Wait(500 * (attempts + 1))
             
             -- Try to force network the entity again
             if not Citizen.InvokeNative(0x0991549DE4D64762, legendaryPed) then
@@ -254,7 +254,7 @@ function StartMonitoringThreads(animalData)
         end
         
         while #spawnedPeds > 0 and spawnedPeds[1] ~= nil do
-            Citizen.Wait(checkInterval * 1000)
+            Wait(checkInterval * 1000)
             
             -- Check if legendary animal is dead
             if DoesEntityExist(spawnedPeds[1]) and IsEntityDead(spawnedPeds[1]) then

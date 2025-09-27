@@ -81,7 +81,7 @@ end)
 -- Function to clean up expired cooldowns (run periodically)
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(60000) -- Check every minute
+        Wait(60000) -- Check every minute
         
         local currentTime = os.time()
         local removedCount = 0

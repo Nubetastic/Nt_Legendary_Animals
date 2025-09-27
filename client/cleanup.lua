@@ -77,7 +77,7 @@ function StartCleanupTimer()
     
     Citizen.CreateThread(function()
         -- Wait for cleanup timer duration
-        Citizen.Wait(Config.CleanupTimer * 1000)
+        Wait(Config.CleanupTimer * 1000)
         
         -- Clean up all spawned peds
         ClearSpawnedPeds()
