@@ -1,5 +1,18 @@
 -- Cleanup functionality for Legendary Animals
 
+-- Helper to get current legendary animal name
+local function GetCurrentLegendaryName()
+    if #spawnedPeds > 0 and spawnedPeds[1] ~= nil and DoesEntityExist(spawnedPeds[1]) then
+        local model = GetEntityModel(spawnedPeds[1])
+        for name, data in pairs(ConfigAnimals) do
+            if data.LegendaryHash == model then
+                return data.BlipName or name
+            end
+        end
+    end
+    return nil
+end
+
 -- Register event for starting cleanup
 RegisterNetEvent('nt_legendary:startCleanup')
 AddEventHandler('nt_legendary:startCleanup', function()
@@ -14,8 +27,15 @@ AddEventHandler('nt_legendary:startCleanup', function()
     -- Start cleanup timer
     StartCleanupTimer()
     
-    -- Notify server that animal was killed
-    TriggerServerEvent('nt_legendary:animalKilled')
+    -- Notify server that animal was killed (pass animal name)
+    local animalName = GetCurrentLegendaryName()
+    if animalName then
+        TriggerServerEvent('nt_legendary:animalKilled', animalName)
+    else
+        if Config.DebugMode then
+            print("animalKilled event skipped: could not determine animal name")
+        end
+    end
 end)
 
 -- Register event for animal escaped
@@ -32,8 +52,15 @@ AddEventHandler('nt_legendary:animalEscaped', function()
     -- Notify player
     TriggerEvent('nt_legendary:notify', 'The legendary animal has escaped!')
     
-    -- Notify server that animal escaped
-    TriggerServerEvent('nt_legendary:animalEscaped')
+    -- Notify server that animal escaped (pass animal name)
+    local animalName = GetCurrentLegendaryName()
+    if animalName then
+        TriggerServerEvent('nt_legendary:animalEscaped', animalName)
+    else
+        if Config.DebugMode then
+            print("animalEscaped event skipped: could not determine animal name")
+        end
+    end
     
     -- Reset player state
     playerState = "tracking"

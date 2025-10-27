@@ -12,31 +12,33 @@ local entityHasBlip = {}
 -- Register client event for attaching a blip to an entity
 RegisterNetEvent('nt_legendary:attachBlipToEntity')
 AddEventHandler('nt_legendary:attachBlipToEntity', function(animalName, netId)
-    -- Get the entity from network ID
-    local entity = NetworkGetEntityFromNetworkId(netId)
-    
-    -- Check if entity exists
-    if not DoesEntityExist(entity) then
-        -- Entity doesn't exist yet, wait for it to be created
-        Citizen.CreateThread(function()
-            local attempts = 0
-            while attempts < 10 and not DoesEntityExist(entity) do
-                Wait(500)
+    -- Try to resolve the network ID robustly
+    Citizen.CreateThread(function()
+        local attempts = 0
+        local maxAttempts = 120 -- up to ~60s if 500ms per attempt
+        local entity = 0
+
+        while attempts < maxAttempts do
+            if NetworkDoesNetworkIdExist(netId) then
                 entity = NetworkGetEntityFromNetworkId(netId)
-                attempts = attempts + 1
+                if entity ~= 0 and DoesEntityExist(entity) then
+                    CreateLegendaryBlip(animalName, entity)
+                    return
+                end
             end
-            
-            if DoesEntityExist(entity) then
-                -- Entity now exists, create blip attached to entity
-                CreateLegendaryBlip(animalName, entity)
-            else
-                print("^1Failed to find entity for legendary " .. animalName .. " after " .. attempts .. " attempts^7")
+
+            if Config.DebugMode and attempts % 10 == 0 then
+                print("^3Waiting for entity for legendary " .. animalName .. " (Network ID: " .. tostring(netId) .. ") attempt " .. attempts .. "/" .. maxAttempts .. "^7")
             end
-        end)
-    else
-        -- Entity exists, create blip attached to entity immediately
-        CreateLegendaryBlip(animalName, entity)
-    end
+
+            attempts = attempts + 1
+            Wait(500)
+        end
+
+        if Config.DebugMode then
+            print("^1Failed to resolve entity for legendary " .. animalName .. " with Network ID: " .. tostring(netId) .. " after " .. attempts .. " attempts^7")
+        end
+    end)
 end)
 
 -- Function to create a blip for legendary animal
@@ -63,10 +65,10 @@ end
 
 -- Function to create a blip attached to the entity
 function CreateEntityBlip(animalName, entity)
-    
     -- Create a blip attached to the entity
     local blip = Citizen.InvokeNative(0x23F74C2FDA6E7C61, 1664425300, entity)
-
+    
+    -- Make the blip visible on networked entities
     Citizen.InvokeNative(0xE37287EE358939C3, entity)
     
     -- Set the sprite (hash)
@@ -77,6 +79,7 @@ function CreateEntityBlip(animalName, entity)
     
     -- Set blip color
     Citizen.InvokeNative(0x662D364ABF16DE2F, blip, GetHashKey(Config.BlipColor))
+	Citizen.InvokeNative(0x662D364ABF16DE2F, blip, GetHashKey("BLIP_MODIFIER_RADAR_EDGE_ALWAYS"))
     
     -- Set blip scale
     SetBlipScale(blip, Config.BlipScale)
@@ -124,7 +127,11 @@ end
 
 -- Function to monitor entity existence and handle blip creation/removal
 function StartBlipMonitorThread(animalName, entityId)
-    LegendaryNotify()
+    -- Only call LegendaryNotify if it exists
+    if LegendaryNotify then
+        LegendaryNotify()
+    end
+    
     Citizen.CreateThread(function()
         local blinkState = true -- Start with blip visible
         local lastToggleTime = 0
@@ -237,20 +244,6 @@ function StartBlipMonitorThread(animalName, entityId)
     
     if Config.DebugMode then
         print("^2Started blip monitor thread for Legendary " .. animalName .. "^7")
-    end
-end
-
--- Function to notify server about legendary animal spawn (called from spawn.lua)
-function NotifyLegendarySpawn(animalName, legendaryPed)
-    
-    -- Get network ID
-    local netId = NetworkGetNetworkIdFromEntity(legendaryPed)
-    
-    -- Notify server
-    TriggerServerEvent('nt_legendary:notifyLegendarySpawn', animalName, netId)
-    
-    if Config.DebugMode then
-        print("^2Notifying server about legendary " .. animalName .. " spawn (Network ID: " .. netId .. ")^7")
     end
 end
 

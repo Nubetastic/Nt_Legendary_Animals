@@ -11,7 +11,6 @@ description 'Legendary Animals System for RedM'
 version '1.0.0'
 
 shared_scripts {
-    '@ox_lib/init.lua',
     'shared/config.lua',
     'shared/configAnimals.lua',
 }
@@ -29,3 +28,5 @@ client_scripts {
 server_scripts {
     'server/server.lua'
 }
+
+dependency 'ox_lib'

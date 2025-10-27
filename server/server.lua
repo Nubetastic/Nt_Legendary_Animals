@@ -3,6 +3,10 @@
 -- Table to track cooldowns for legendary animals
 local animalCooldowns = {}
 
+-- Table to store active legendary animals and their network IDs
+local activeLegendaryAnimals = {}
+local activeCompanionAnimals = {}
+
 -- Register server event for checking if animal is on cooldown
 RegisterServerEvent('nt_legendary:checkAnimalCooldown')
 AddEventHandler('nt_legendary:checkAnimalCooldown', function(animalName)
@@ -58,23 +62,43 @@ end)
 
 -- Register server event for when an animal is killed
 RegisterServerEvent('nt_legendary:animalKilled')
-AddEventHandler('nt_legendary:animalKilled', function()
+AddEventHandler('nt_legendary:animalKilled', function(animalName)
     local source = source
+
+    if not animalName or animalName == '' then
+        if Config.DebugMode then
+            print("Server: animalKilled received without animalName from " .. tostring(source))
+        end
+        return
+    end
+    
+    -- Remove from active animals
+    activeLegendaryAnimals[animalName] = nil
     
     -- Log the kill
     if Config.DebugMode then
-        print("Server: Legendary animal killed by player " .. GetPlayerName(source) .. " (ID: " .. source .. ")")
+        print("Server: Legendary animal " .. animalName .. " killed by player " .. GetPlayerName(source) .. " (ID: " .. source .. ")")
     end
 end)
 
 -- Register server event for when an animal escapes
 RegisterServerEvent('nt_legendary:animalEscaped')
-AddEventHandler('nt_legendary:animalEscaped', function()
+AddEventHandler('nt_legendary:animalEscaped', function(animalName)
     local source = source
+
+    if not animalName or animalName == '' then
+        if Config.DebugMode then
+            print("Server: animalEscaped received without animalName from " .. tostring(source))
+        end
+        return
+    end
+    
+    -- Remove from active animals
+    activeLegendaryAnimals[animalName] = nil
     
     -- Log the escape
     if Config.DebugMode then
-        print("Server: Legendary animal escaped from player " .. GetPlayerName(source) .. " (ID: " .. source .. ")")
+        print("Server: Legendary animal " .. animalName .. " escaped from player " .. GetPlayerName(source) .. " (ID: " .. source .. ")")
     end
 end)
 
@@ -136,6 +160,48 @@ AddEventHandler('nt_legendary:getServerWeather', function()
     end
 end)
 
+-- Register server event for caching network IDs of legendary and companion animals
+RegisterServerEvent('nt_legendary:cacheNetworkIds')
+AddEventHandler('nt_legendary:cacheNetworkIds', function(animalName, legendaryNetId, companionNetIds)
+    local source = source
+
+    -- Validate
+    if not animalName or not legendaryNetId or tonumber(legendaryNetId) == 0 then
+        if Config.DebugMode then
+            print("Server: cacheNetworkIds invalid data from " .. tostring(source) .. ", animal=" .. tostring(animalName) .. ", netId=" .. tostring(legendaryNetId))
+        end
+        return
+    end
+    
+    -- Store the network IDs
+    activeLegendaryAnimals[animalName] = {
+        netId = legendaryNetId,
+        owner = source,
+        timestamp = os.time()
+    }
+    
+    -- Store companion network IDs if provided
+    if companionNetIds and #companionNetIds > 0 then
+        activeCompanionAnimals[animalName] = {
+            netIds = companionNetIds,
+            owner = source,
+            timestamp = os.time()
+        }
+    end
+    
+    if Config.DebugMode then
+        print("Server: Cached network ID " .. legendaryNetId .. " for legendary " .. animalName .. " from player " .. source)
+        if companionNetIds and #companionNetIds > 0 then
+            print("Server: Cached " .. #companionNetIds .. " companion network IDs for " .. animalName)
+        end
+    end
+    
+    -- Slight delay to reduce race with replication
+    SetTimeout(1500, function()
+        TriggerClientEvent('nt_legendary:attachBlipToEntity', -1, animalName, legendaryNetId)
+    end)
+end)
+
 -- Register server event for notifying all clients about a legendary animal spawn
 RegisterServerEvent('nt_legendary:notifyLegendarySpawn')
 AddEventHandler('nt_legendary:notifyLegendarySpawn', function(animalName, netId)
@@ -145,6 +211,78 @@ AddEventHandler('nt_legendary:notifyLegendarySpawn', function(animalName, netId)
     -- Log the broadcast
     if Config.DebugMode then
         print("Server: Broadcasting legendary " .. animalName .. " (Network ID: " .. netId .. ") to all players")
+    end
+end)
+
+-- Handle player joining - notify them of any active legendary animals
+AddEventHandler('playerJoining', function(source)
+    -- Wait a moment for the player to fully load
+    Citizen.Wait(5000)
+    
+    -- Check if there are any active legendary animals
+    local activeCount = 0
+    for animalName, data in pairs(activeLegendaryAnimals) do
+        -- Only notify about recent spawns (within the last hour)
+        if os.time() - data.timestamp < 3600 then
+            -- Send notification to the joining player
+            TriggerClientEvent('nt_legendary:notify', source, 'A ' .. animalName .. ' was recently spotted in the wilderness!')
+            
+            -- Send network ID to attach blip
+            TriggerClientEvent('nt_legendary:attachBlipToEntity', source, animalName, data.netId)
+            
+            activeCount = activeCount + 1
+        end
+    end
+    
+    if Config.DebugMode and activeCount > 0 then
+        print("Server: Notified joining player " .. GetPlayerName(source) .. " (ID: " .. source .. ") about " .. activeCount .. " active legendary animals")
+    end
+end)
+
+-- Handle player dropping to clean up their animals
+AddEventHandler('playerDropped', function()
+    local source = source
+    
+    -- Check if this player owned any legendary animals
+    for animalName, data in pairs(activeLegendaryAnimals) do
+        if data.owner == source then
+            -- This player owned this animal, remove it from active list
+            activeLegendaryAnimals[animalName] = nil
+            
+            if Config.DebugMode then
+                print("Server: Removed legendary " .. animalName .. " from active list due to owner disconnect")
+            end
+        end
+    end
+    
+    -- Check if this player owned any companion animals
+    for animalName, data in pairs(activeCompanionAnimals) do
+        if data.owner == source then
+            -- This player owned these companions, remove them from active list
+            activeCompanionAnimals[animalName] = nil
+            
+            if Config.DebugMode then
+                print("Server: Removed companions for " .. animalName .. " from active list due to owner disconnect")
+            end
+        end
+    end
+end)
+
+-- Register server event for requesting active legendary animals
+RegisterServerEvent('nt_legendary:requestActiveAnimals')
+AddEventHandler('nt_legendary:requestActiveAnimals', function()
+    local source = source
+    
+    -- Send active legendary animals to the requesting client
+    for animalName, data in pairs(activeLegendaryAnimals) do
+        -- Only send recent spawns (within the last hour)
+        if os.time() - data.timestamp < 3600 then
+            TriggerClientEvent('nt_legendary:attachBlipToEntity', source, animalName, data.netId)
+            
+            if Config.DebugMode then
+                print("Server: Sent active legendary " .. animalName .. " (Network ID: " .. data.netId .. ") to player " .. source)
+            end
+        end
     end
 end)
 

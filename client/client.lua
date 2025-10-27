@@ -23,6 +23,14 @@ Citizen.CreateThread(function()
         print("Current time: " .. currentTime)
         print("Current weather: " .. currentWeather)
     end
+    
+    -- Request active legendary animals from server
+    Wait(3000) -- Wait a bit more to ensure network is ready
+    TriggerServerEvent('nt_legendary:requestActiveAnimals')
+    
+    if Config.DebugMode then
+        print("Requested active legendary animals from server")
+    end
 end)
 
 -- Main loop to check for legendary animal spawn areas
@@ -234,4 +242,48 @@ AddEventHandler('nt_legendary:animalNotOnCooldown', function(animalName)
     end
 end)
 
--- Blip-related events have been removed
+-- Register event for animal escaped
+RegisterNetEvent('nt_legendary:animalEscaped')
+AddEventHandler('nt_legendary:animalEscaped', function()
+    -- Handle animal escaped
+    if Config.DebugMode then
+        print("Legendary animal escaped")
+    end
+    
+    -- Clear spawned peds
+    ClearSpawnedPeds()
+    
+    -- Reset player state
+    playerState = "tracking"
+    
+    -- Set global cooldown
+    globalCooldown = Config.SpawnCooldownFail
+    
+    -- Notify player
+    TriggerEvent('nt_legendary:notify', 'The legendary animal has escaped!')
+end)
+
+-- Register event for starting cleanup
+RegisterNetEvent('nt_legendary:startCleanup')
+AddEventHandler('nt_legendary:startCleanup', function()
+    -- Start cleanup timer
+    if Config.DebugMode then
+        print("Starting cleanup timer for " .. Config.CleanupTimer .. " seconds")
+    end
+    
+    -- Wait for cleanup timer
+    Citizen.CreateThread(function()
+        -- Wait for cleanup timer
+        Wait(Config.CleanupTimer * 1000)
+        
+        -- Clear spawned peds
+        ClearSpawnedPeds()
+        
+        -- Reset player state
+        playerState = "tracking"
+        
+        if Config.DebugMode then
+            print("Cleanup complete, player state reset to tracking")
+        end
+    end)
+end)

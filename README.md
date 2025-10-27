@@ -24,5 +24,4 @@ If the animal is not listed there it was given custom settings.
 5. Blips are created for all players within range
 6. Animals remain until killed or until they escape (when no players are nearby)
 
-
 This script only spawns legendary animals and some companions with them.

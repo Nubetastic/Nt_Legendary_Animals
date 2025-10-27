@@ -3,7 +3,7 @@
 -- Register notification event
 function LegendaryNotify()
     -- Use ox_lib notification with config settings
-    lib.notify({
+    exports.ox_lib:notify({
         title = 'Legendary Animal',
         description = "Spotted near you!",
         icon = 'map',

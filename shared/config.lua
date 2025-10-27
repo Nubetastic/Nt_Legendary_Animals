@@ -15,7 +15,7 @@ Config.SpawnDistance = 600 -- Distance to try to spawn a legendary animal.
 Config.DistanceEscape = 250 -- If player is more then this distance it starts escaping.
 
 -- Spawn chances
-Config.SpawnChance = 10 -- base chance for spawning a legendary animal. Set to 100 for 100% spawn.
+Config.SpawnChance = 100 -- base chance for spawning a legendary animal. Set to 100 for 100% spawn.
 Config.SpawnTimeChance = 5 -- added to spawnchance if the time of day matches range
 Config.SpawnWeatherChance = 15 -- added to spawnchance if the weather matches
 

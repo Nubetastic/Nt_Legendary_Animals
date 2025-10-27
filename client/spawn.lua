@@ -32,7 +32,55 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
     -- Create the legendary animal ped
     local x, y, z, heading = table.unpack(spawnLocation)
     -- Use true for the isNetwork parameter (5th parameter) to ensure it's networked from creation
-    local legendaryPed = CreatePed(legendaryHash, x, y, z, heading, true, true, true, false)
+    local legendaryPed = Citizen.InvokeNative(0xD49F9B0955C367DE, legendaryHash, x, y, z, heading, true, false, false, false)
+    
+    if not DoesEntityExist(legendaryPed) then
+        if Config.DebugMode then
+            print("Failed to create legendary animal entity")
+        end
+        return false
+    end
+    
+    -- Set as mission entity so it doesn't despawn
+    SetEntityAsMissionEntity(legendaryPed, true, true)
+    
+    -- Ensure the entity is networked
+    if not NetworkGetEntityIsNetworked(legendaryPed) then
+        NetworkRegisterEntityAsNetworked(legendaryPed)
+        
+        -- Wait for network registration
+        local netRegTimeout = 0
+        while not NetworkGetEntityIsNetworked(legendaryPed) and netRegTimeout < 30 do
+            Wait(100)
+            netRegTimeout = netRegTimeout + 1
+        end
+        
+        if not NetworkGetEntityIsNetworked(legendaryPed) then
+            if Config.DebugMode then
+                print("Failed to register legendary animal as networked entity")
+            end
+            DeleteEntity(legendaryPed)
+            return false
+        end
+    end
+    
+    -- Get the network ID
+    local legendaryNetId = NetworkGetNetworkIdFromEntity(legendaryPed)
+    
+    -- Validate network ID
+    if not legendaryNetId or legendaryNetId == 0 then
+        if Config.DebugMode then
+            print("Failed to get valid network ID for legendary animal")
+        end
+        DeleteEntity(legendaryPed)
+        return false
+    end
+    
+    -- Set network ID to exist on all machines
+    SetNetworkIdExistsOnAllMachines(legendaryNetId, true)
+    -- Ensure stable migration and non-dynamic ownership
+    --NetworkSetNetworkIdDynamic(legendaryNetId, false)
+    --SetNetworkIdCanMigrate(legendaryNetId, true)
     
     -- Apply wandering behavior to the legendary animal
     -- TASK_WANDER_IN_AREA (0xE054346CA3A0F315)
@@ -45,11 +93,11 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
         SetPedOutfitPreset(legendaryPed, animalData.Legendaryoutfit)
     end
     
-    -- Set as mission entity so it doesn't despawn
-    SetEntityAsMissionEntity(legendaryPed, true, true)
-    
     -- Add to spawnedPeds table as first entry
     table.insert(spawnedPeds, legendaryPed)
+    
+    -- Table to store companion network IDs
+    local companionNetIds = {}
     
     -- Spawn companion animals
     local companionHash = animalData.CompanionHash
@@ -70,37 +118,60 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
                 -- Calculate spawn position (random offset from legendary animal)
                 local spawnOffsetX = math.random(-10, 10)
                 local spawnOffsetY = math.random(-10, 10)
-                -- Use true for the isNetwork parameter (5th parameter) to ensure it's networked from creation
-                local companionPed = CreatePed(companionHash, x + spawnOffsetX, y + spawnOffsetY, z, heading, true, true, true, false)
                 
-                -- Apply follow behavior to the companion animal
-                -- TASK_FOLLOW_TO_OFFSET_OF_ENTITY (0x304AE42E357B8C7E)
-                -- Parameters: ped, entity, offsetX, offsetY, offsetZ, movementSpeed, timeout, stoppingRange, persistFollowing
-                local offsetX = math.random( 15, 60)
-                local offsety = math.random( 15, 60)
-                local timeout = -1 -- Never timeout
-                local stoppingRange = math.random(10.0, 60.0) -- How close the companion gets before stopping
-                local persistFollowing = true -- Continue following even after reaching the target
-                Citizen.InvokeNative(0x304AE42E357B8C7E, companionPed, legendaryPed, offsetX, offsety, 0.0, 2, timeout, stoppingRange, persistFollowing)
+                -- Create the companion ped with network flag
+                local companionPed = Citizen.InvokeNative(0xD49F9B0955C367DE, companionHash, 
+                    x + spawnOffsetX, y + spawnOffsetY, z, heading, true, false, false, false)
                 
-                
-                -- Set random outfit variant if specified
-                if animalData.CompanionOutfit and #animalData.CompanionOutfit > 0 then
-                    local outfitIndex = math.random(1, #animalData.CompanionOutfit)
-                    local outfitVariant = animalData.CompanionOutfit[outfitIndex]
-                    SetPedOutfitPreset(companionPed, outfitVariant)
+                if DoesEntityExist(companionPed) then
+                    -- Set as mission entity
+                    SetEntityAsMissionEntity(companionPed, true, true)
+                    
+                    -- Ensure the entity is networked
+                    if not NetworkGetEntityIsNetworked(companionPed) then
+                        NetworkRegisterEntityAsNetworked(companionPed)
+                        
+                        -- Wait for network registration
+                        local netRegTimeout = 0
+                        while not NetworkGetEntityIsNetworked(companionPed) and netRegTimeout < 30 do
+                            Wait(100)
+                            netRegTimeout = netRegTimeout + 1
+                        end
+                    end
+                    
+                    -- Get and validate network ID
+                    local companionNetId = NetworkGetNetworkIdFromEntity(companionPed)
+                    if companionNetId and companionNetId > 0 then
+                        -- Set network ID to exist on all machines
+                        SetNetworkIdExistsOnAllMachines(companionNetId, true)
+                        -- Ensure stable migration and non-dynamic ownership
+                        --NetworkSetNetworkIdDynamic(companionNetId, false)
+                        --SetNetworkIdCanMigrate(companionNetId, true)
+                        
+                        -- Store the network ID
+                        table.insert(companionNetIds, companionNetId)
+                    end
+                    
+                    -- Apply follow behavior to the companion animal
+                    -- TASK_FOLLOW_TO_OFFSET_OF_ENTITY (0x304AE42E357B8C7E)
+                    -- Parameters: ped, entity, offsetX, offsetY, offsetZ, movementSpeed, timeout, stoppingRange, persistFollowing
+                    local offsetX = math.random(15, 60)
+                    local offsetY = math.random(15, 60)
+                    local timeout = -1 -- Never timeout
+                    local stoppingRange = math.random(10.0, 60.0) -- How close the companion gets before stopping
+                    local persistFollowing = true -- Continue following even after reaching the target
+                    Citizen.InvokeNative(0x304AE42E357B8C7E, companionPed, legendaryPed, offsetX, offsetY, 0.0, 2, timeout, stoppingRange, persistFollowing)
+                    
+                    -- Set random outfit variant if specified
+                    if animalData.CompanionOutfit and #animalData.CompanionOutfit > 0 then
+                        local outfitIndex = math.random(1, #animalData.CompanionOutfit)
+                        local outfitVariant = animalData.CompanionOutfit[outfitIndex]
+                        SetPedOutfitPreset(companionPed, outfitVariant)
+                    end
+                    
+                    -- Add to spawnedPeds table
+                    table.insert(spawnedPeds, companionPed)
                 end
-                
-                -- Set as mission entity
-                SetEntityAsMissionEntity(companionPed, true, true)
-                
-                -- Ensure companion is networked
-                if not Citizen.InvokeNative(0x0991549DE4D64762, companionPed) then
-                    Citizen.InvokeNative(0x06FAACD625D80CAA, companionPed)
-                end
-                
-                -- Add to spawnedPeds table
-                table.insert(spawnedPeds, companionPed)
             end
         else
             if Config.DebugMode then
@@ -109,101 +180,8 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
         end
     end
     
-    -- Set as mission entity so it doesn't despawn
-    -- ENTITY::SET_ENTITY_AS_MISSION_ENTITY (0xAD738C3085FE7E11)
-    Citizen.InvokeNative(0xAD738C3085FE7E11, legendaryPed, true, true)
-    
-    -- Wait a moment for the entity to be fully created
-    Wait(100)
-    
-    -- Check if the entity is already networked (it should be since we created it with CreatePed)
-    -- NETWORK::NETWORK_GET_ENTITY_IS_NETWORKED (0x0991549DE4D64762)
-    local isNetworked = Citizen.InvokeNative(0x0991549DE4D64762, legendaryPed)
-    
-    if not isNetworked then
-        -- If not networked, try to register it
-        -- NETWORK::NETWORK_REGISTER_ENTITY_AS_NETWORKED (0x06FAACD625D80CAA)
-        Citizen.InvokeNative(0x06FAACD625D80CAA, legendaryPed)
-        
-        -- Wait a moment for networking to take effect
-        Wait(100)
-        
-        -- Check again if it's networked
-        isNetworked = Citizen.InvokeNative(0x0991549DE4D64762, legendaryPed)
-    end
-    
-    -- Get the network ID directly from the entity
-    -- NETWORK::NETWORK_GET_NETWORK_ID_FROM_ENTITY (0xA11700682F3AD45C)
-    local netId = Citizen.InvokeNative(0xA11700682F3AD45C, legendaryPed)
-    
-    -- Log the network ID
-    if Config.DebugMode then
-        print("^3Legendary animal network ID: " .. tostring(netId) .. "^7")
-    end
-    
-    -- Ensure the network ID is valid
-    if netId and netId ~= 0 then
-        -- Set this entity as visible to network (not invisible)
-        -- NETWORK::SET_ENTITY_INVISIBLE_TO_NETWORK (0xF1CA12B18AEF5298)
-        Citizen.InvokeNative(0xF1CA12B18AEF5298, legendaryPed, false)
-        
-        -- Use native calls for network ID configuration
-        -- NETWORK::SET_NETWORK_ID_EXISTS_ON_ALL_MACHINES (0xE05E81A888FA63C8)
-        Citizen.InvokeNative(0xE05E81A888FA63C8, netId, true)
-        
-        -- NETWORK::SET_NETWORK_ID_CAN_MIGRATE (0x299EEB23175895FC)
-        Citizen.InvokeNative(0x299EEB23175895FC, netId, false) -- Changed to false to prevent migration
-        
-        -- Networking is complete
-        Wait(500)
-        if Config.DebugMode then
-            print("^2Legendary animal network ID: " .. netId .. "^7")
-        end
-    else
-        if Config.DebugMode then
-            print("^1ERROR: Failed to get network ID for legendary animal^7")
-        end
-        
-        -- Try multiple times to get a valid network ID
-        local attempts = 0
-        local maxAttempts = 5
-        
-        while (not netId or netId == 0) and attempts < maxAttempts do
-            Wait(500 * (attempts + 1))
-            
-            -- Try to force network the entity again
-            if not Citizen.InvokeNative(0x0991549DE4D64762, legendaryPed) then
-                Citizen.InvokeNative(0x06FAACD625D80CAA, legendaryPed)
-            end
-            
-            -- Get network ID again
-            netId = Citizen.InvokeNative(0xA11700682F3AD45C, legendaryPed)
-            attempts = attempts + 1
-            
-            if Config.DebugMode then
-                print("^3Networking attempt " .. attempts .. ": Network ID = " .. tostring(netId) .. "^7")
-            end
-        end
-        
-        if netId and netId ~= 0 then
-            if Config.DebugMode then
-                print("^2Got network ID after " .. attempts .. " attempts: " .. netId .. "^7")
-            end
-            
-            -- Configure network ID and sync with server
-            Citizen.InvokeNative(0xF1CA12B18AEF5298, legendaryPed, false)
-            Citizen.InvokeNative(0xE05E81A888FA63C8, netId, true)
-            Citizen.InvokeNative(0x299EEB23175895FC, netId, false) -- Changed to false to prevent migration
-            
-            if Config.DebugMode then
-                print("^2Legendary animal " .. animalData.BlipName .. " network ID: " .. netId .. "^7")
-            end
-        else
-            if Config.DebugMode then
-                print("^1CRITICAL ERROR: Failed to get network ID after " .. maxAttempts .. " attempts^7")
-            end
-        end
-    end
+    -- Cache the network IDs on the server
+    TriggerServerEvent('nt_legendary:cacheNetworkIds', animalData.BlipName, legendaryNetId, companionNetIds)
     
     -- Start monitoring threads
     StartMonitoringThreads(animalData)
@@ -211,11 +189,11 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
     -- Notify player
     TriggerEvent('nt_legendary:notify', 'You have discovered a ' .. animalData.BlipName .. '!')
     
-    -- Notify all clients to attach a blip to the legendary animal
-    NotifyLegendarySpawn(animalData.BlipName, legendaryPed)
-    
     if Config.DebugMode then
-        print("^2Legendary animal spawn complete: " .. animalData.BlipName .. "^7")
+        print("^2Legendary animal spawn complete: " .. animalData.BlipName .. " (Network ID: " .. legendaryNetId .. ")^7")
+        if #companionNetIds > 0 then
+            print("^2Spawned " .. #companionNetIds .. " companion animals^7")
+        end
     end
     
     return true
@@ -261,6 +239,8 @@ function StartMonitoringThreads(animalData)
                 if Config.DebugMode then
                     print("Legendary animal is dead, starting cleanup")
                 end
+                -- Notify server that animal was killed
+                TriggerServerEvent('nt_legendary:animalKilled', animalData.BlipName)
                 -- Start cleanup process
                 TriggerEvent('nt_legendary:startCleanup')
                 break
@@ -278,6 +258,8 @@ function StartMonitoringThreads(animalData)
                     if Config.DebugMode then
                         print("No players in range for too long, animal escaping")
                     end
+                    -- Notify server that animal escaped
+                    TriggerServerEvent('nt_legendary:animalEscaped', animalData.BlipName)
                     TriggerEvent('nt_legendary:animalEscaped')
                     break
                 end
@@ -288,8 +270,10 @@ function StartMonitoringThreads(animalData)
                 end
             else
                 -- Reset timer if player in range
-                if escapeTimer < Config.EscapeTimer and Config.DebugMode then
-                    print("Player in range, resetting escape timer")
+                if escapeTimer < Config.EscapeTimer then
+                    if Config.DebugMode then
+                        print("Player in range, resetting escape timer")
+                    end
                     escapeTimer = Config.EscapeTimer
                 end
             end
@@ -355,5 +339,18 @@ AddEventHandler('onResourceStop', function(resourceName)
         print("^3Resource " .. resourceName .. " is stopping, cleaning up peds...^7")
         -- Clean up all spawned peds when the resource stops
         ClearSpawnedPeds()
+    end
+end)
+
+-- Request active legendary animals when client starts
+Citizen.CreateThread(function()
+    -- Wait for player to fully load
+    Wait(5000)
+    
+    -- Request active legendary animals from server
+    TriggerServerEvent('nt_legendary:requestActiveAnimals')
+    
+    if Config.DebugMode then
+        print("Requested active legendary animals from server")
     end
 end)
