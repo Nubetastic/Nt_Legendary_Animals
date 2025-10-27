@@ -15,7 +15,7 @@ Config.SpawnDistance = 600 -- Distance to try to spawn a legendary animal.
 Config.DistanceEscape = 250 -- If player is more then this distance it starts escaping.
 
 -- Spawn chances
-Config.SpawnChance = 100 -- base chance for spawning a legendary animal. Set to 100 for 100% spawn.
+Config.SpawnChance = 10 -- base chance for spawning a legendary animal. Set to 100 for 100% spawn.
 Config.SpawnTimeChance = 5 -- added to spawnchance if the time of day matches range
 Config.SpawnWeatherChance = 15 -- added to spawnchance if the weather matches
 
@@ -30,7 +30,7 @@ Config.CacheRefreshInterval = 30 -- seconds between player cache refreshes
 -- Blip settings
 Config.BlipSprite = -1646261997
 Config.BlipColor = "BLIP_MODIFIER_MP_COLOR_28" -- Red color
-Config.BlipScale = 1.5 -- Size of the blip
+Config.BlipScale = 2 -- Size of the blip
 Config.BlipDistanceMax = 700 -- Distance at which the blip is visible.
 Config.BlipDistanceMin = 100 -- stop the blip from blinking.
 Config.BlipBlinkRate = 200 -- 50 milliseconds per 25 distance.
