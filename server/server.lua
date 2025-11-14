@@ -57,7 +57,7 @@ AddEventHandler('nt_legendary:animalSpawned', function(animalName)
     end
     
     -- Notify all players that a legendary animal was spotted
-    TriggerClientEvent('nt_legendary:notifyAll', -1, 'A ' .. animalName .. ' has been spotted in the wilderness!')
+    TriggerEvent('nt_legendary:notifyAll', 'A ' .. animalName .. ' has been spotted in the wilderness!')
 end)
 
 -- Register server event for when an animal is killed
