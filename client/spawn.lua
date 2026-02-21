@@ -183,8 +183,8 @@ function SpawnLegendaryAnimal(animalData, spawnLocation)
     -- Cache the network IDs on the server
     TriggerServerEvent('nt_legendary:cacheNetworkIds', animalData.BlipName, legendaryNetId, companionNetIds)
     
-    -- Start monitoring threads
-    StartMonitoringThreads(animalData)
+    -- Start centralized cleanup monitor
+    StartCleanupMonitor(animalData)
     
     -- Notify player
     TriggerEvent('nt_legendary:notify', 'You have discovered a ' .. animalData.BlipName .. '!')
@@ -219,79 +219,18 @@ function ClearSpawnedPeds()
     end
 end
 
--- Function to start monitoring threads
-function StartMonitoringThreads(animalData)
-    -- Start escape timer thread
-    Citizen.CreateThread(function()
-        -- Monitor for escape conditions
-        local escapeTimer = Config.EscapeTimer
-        local checkInterval = Config.PlayerCheckInterval
-        
-        if Config.DebugMode then
-            print("Starting monitoring thread for legendary animal")
-        end
-        
-        while #spawnedPeds > 0 and spawnedPeds[1] ~= nil do
-            Wait(checkInterval * 1000)
-            
-            -- Check if legendary animal is dead
-            if DoesEntityExist(spawnedPeds[1]) and IsEntityDead(spawnedPeds[1]) then
-                if Config.DebugMode then
-                    print("Legendary animal is dead, starting cleanup")
-                end
-                -- Notify server that animal was killed
-                TriggerServerEvent('nt_legendary:animalKilled', animalData.BlipName)
-                -- Start cleanup process
-                TriggerEvent('nt_legendary:startCleanup')
-                break
-            end
-            
-            -- Check if any player is in range
-            local playerInRange = CheckPlayerInRange(Config.DistanceEscape)
-            
-            if not playerInRange then
-                -- No player in range, increment escape timer
-                escapeTimer = escapeTimer - checkInterval
-                
-                if escapeTimer <= 0 then
-                    -- Animal escapes
-                    if Config.DebugMode then
-                        print("No players in range for too long, animal escaping")
-                    end
-                    -- Notify server that animal escaped
-                    TriggerServerEvent('nt_legendary:animalEscaped', animalData.BlipName)
-                    TriggerEvent('nt_legendary:animalEscaped')
-                    break
-                end
-                
-                -- Debug output for escape timer
-                if Config.DebugMode and escapeTimer % 60 == 0 then
-                    print("Animal escape timer: " .. escapeTimer .. " seconds remaining")
-                end
-            else
-                -- Reset timer if player in range
-                if escapeTimer < Config.EscapeTimer then
-                    if Config.DebugMode then
-                        print("Player in range, resetting escape timer")
-                    end
-                    escapeTimer = Config.EscapeTimer
-                end
-            end
-        end
-    end)
-end
-
--- Function to check if any player is in range
-function CheckPlayerInRange(range)
-    -- Check if any player is in range
+-- Function to check if any player is in range of a location or the legendary animal
+function CheckPlayerInRange(range, coords)
+    -- If no coords provided, try to get legendary animal position
+    local targetCoords = coords
     
-    -- If no legendary animal exists, return false
-    if #spawnedPeds == 0 or not DoesEntityExist(spawnedPeds[1]) then
-        return false
+    if not targetCoords then
+        -- If no legendary animal exists and no coords, return false
+        if #spawnedPeds == 0 or not DoesEntityExist(spawnedPeds[1]) then
+            return false
+        end
+        targetCoords = GetEntityCoords(spawnedPeds[1])
     end
-    
-    -- Get legendary animal position
-    local animalCoords = GetEntityCoords(spawnedPeds[1])
     
     -- First check cached player if exists
     if playerCache ~= nil then
@@ -301,7 +240,7 @@ function CheckPlayerInRange(range)
             
             if DoesEntityExist(playerPed) then
                 local playerCoords = GetEntityCoords(playerPed)
-                local distance = #(animalCoords - playerCoords)
+                local distance = #(targetCoords - playerCoords)
                 
                 if distance <= range then
                     -- Cached player is still in range
@@ -319,7 +258,7 @@ function CheckPlayerInRange(range)
     for _, playerId in ipairs(players) do
         local playerPed = GetPlayerPed(playerId)
         local playerCoords = GetEntityCoords(playerPed)
-        local distance = #(animalCoords - playerCoords)
+        local distance = #(targetCoords - playerCoords)
         
         if distance <= range then
             -- Player is in range, cache this player

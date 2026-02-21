@@ -6,6 +6,7 @@ playerCache = nil -- Cached player that is within range of the legendary animal
 currentTime = 0 -- Current time of day
 currentWeather = "" -- Current weather
 playerState = "tracking" -- Current state: tracking, cooldown, or hunting
+legendaryDeathCoords = nil -- Coordinates where the legendary animal died
 localCooldowns = {} -- Table to track local cooldowns for specific animals
 globalCooldown = 0 -- Cooldown for all legendary animals
 
@@ -240,50 +241,4 @@ AddEventHandler('nt_legendary:animalNotOnCooldown', function(animalName)
             print("Error: Could not find data for animal " .. animalName)
         end
     end
-end)
-
--- Register event for animal escaped
-RegisterNetEvent('nt_legendary:animalEscaped')
-AddEventHandler('nt_legendary:animalEscaped', function()
-    -- Handle animal escaped
-    if Config.DebugMode then
-        print("Legendary animal escaped")
-    end
-    
-    -- Clear spawned peds
-    ClearSpawnedPeds()
-    
-    -- Reset player state
-    playerState = "tracking"
-    
-    -- Set global cooldown
-    globalCooldown = Config.SpawnCooldownFail
-    
-    -- Notify player
-    TriggerEvent('nt_legendary:notify', 'The legendary animal has escaped!')
-end)
-
--- Register event for starting cleanup
-RegisterNetEvent('nt_legendary:startCleanup')
-AddEventHandler('nt_legendary:startCleanup', function()
-    -- Start cleanup timer
-    if Config.DebugMode then
-        print("Starting cleanup timer for " .. Config.CleanupTimer .. " seconds")
-    end
-    
-    -- Wait for cleanup timer
-    Citizen.CreateThread(function()
-        -- Wait for cleanup timer
-        Wait(Config.CleanupTimer * 1000)
-        
-        -- Clear spawned peds
-        ClearSpawnedPeds()
-        
-        -- Reset player state
-        playerState = "tracking"
-        
-        if Config.DebugMode then
-            print("Cleanup complete, player state reset to tracking")
-        end
-    end)
 end)
