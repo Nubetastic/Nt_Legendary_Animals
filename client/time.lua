@@ -78,7 +78,7 @@ function UpdateCurrentTime()
 end
 
 -- Initialize time tracking
-Citizen.CreateThread(function()
+CreateThread(function()
     while true do
         Wait(60000) -- Update every minute
         UpdateCurrentTime()
@@ -86,7 +86,7 @@ Citizen.CreateThread(function()
 end)
 
 -- Initial time update
-Citizen.CreateThread(function()
+CreateThread(function()
     Wait(5000) -- Longer delay on startup to ensure weathersync is initialized
     UpdateCurrentTime()
 end)

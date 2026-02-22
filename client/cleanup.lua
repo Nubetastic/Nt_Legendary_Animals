@@ -35,25 +35,20 @@ function StartCleanupMonitor(animalData)
         print("Starting centralized cleanup monitor for " .. animalData.BlipName)
     end
     
-    Citizen.CreateThread(function()
+    CreateThread(function()
         -- Initialize flags
         local livingFlag = true
         local playersInAreaFlag = false
-        local pedsExistFlag = true
         local missionActive = true
         
         -- Initialize timers (in milliseconds) - count down to 0
         local liveAbandonmentTimer = Config.Cleanup.Timers.LiveAbandonmentTimeout
-        local deadAbandonmentTimer = Config.Cleanup.Timers.DeadAbandonmentTimeout
-        local deadNonAbandonmentTimer = Config.Cleanup.Timers.DeadExpiryTimeout
+        local deathTimer = Config.Cleanup.Timers.DeadExpiryTimeout
         local maxMissionTimer = Config.Cleanup.Timers.GlobalTimeout
         
         -- Timer management
-        local timerAddInterval = 1000
         local monitorInterval = Config.Cleanup.MonitorCheckInterval
-        local lastMMTFloor = math.floor(maxMissionTimer / timerAddInterval)
         
-        local deathTime = nil
         local triggerReason = ""
         local lastDebugPrint = 0
         local debugPrintInterval = 5000
@@ -62,61 +57,41 @@ function StartCleanupMonitor(animalData)
             Wait(Config.Cleanup.MonitorCheckInterval)
             local now = GetGameTimer()
             
-            -- Check if peds still exist
-            if #spawnedPeds == 0 or not DoesEntityExist(spawnedPeds[1]) then
-                pedsExistFlag = false
-                triggerReason = livingFlag and "peds_disappeared_living" or "skinned"
-                missionActive = false
-            else
+            -- Check if peds still exist or if animal is dead
+            local pedExists = #spawnedPeds > 0 and DoesEntityExist(spawnedPeds[1])
+            
+            if pedExists then
                 local legendaryPed = spawnedPeds[1]
                 
-                -- Update living flag
+                -- Update living flag if animal dies
                 if livingFlag and IsEntityDead(legendaryPed) then
                     livingFlag = false
-                    deathTime = now
                     legendaryDeathCoords = GetEntityCoords(legendaryPed)
                     TriggerServerEvent('nt_legendary:animalKilled', animalData.BlipName)
                     RemoveLegendaryBlip()
                 end
-                
-                -- Update players in area flag
-                if livingFlag then
-                    playersInAreaFlag = CheckPlayerInRange(Config.Cleanup.Proximity.Escape)
-                else
-                    playersInAreaFlag = CheckPlayerInRange(Config.Cleanup.Proximity.DeadBody, legendaryDeathCoords)
-                end
+            elseif livingFlag then
+                -- Entity disappeared while alive (skinned)
+                livingFlag = false
+                triggerReason = "skinned"
+                TriggerServerEvent('nt_legendary:animalKilled', animalData.BlipName)
+                RemoveLegendaryBlip()
             end
             
-            -- Add timer seconds every 5 seconds when conditions are not active
-            local currentMMTFloor = math.floor(maxMissionTimer / monitorInterval)
-            if currentMMTFloor ~= lastMMTFloor then
-                lastMMTFloor = currentMMTFloor
-                
-                if livingFlag and playersInAreaFlag and liveAbandonmentTimer > 0 then
-                    liveAbandonmentTimer = math.min(liveAbandonmentTimer + timerAddInterval, Config.Cleanup.Timers.LiveAbandonmentTimeout)
-                end
-                
-                if not livingFlag then
-                    if playersInAreaFlag and deadAbandonmentTimer > 0 then
-                        deadAbandonmentTimer = math.min(deadAbandonmentTimer + timerAddInterval, Config.Cleanup.Timers.DeadAbandonmentTimeout)
-                    end
-                    if not playersInAreaFlag and deadNonAbandonmentTimer > 0 then
-                        deadNonAbandonmentTimer = math.min(deadNonAbandonmentTimer + timerAddInterval, Config.Cleanup.Timers.DeadExpiryTimeout)
-                    end
-                end
+            -- Check players in area
+            if livingFlag then
+                playersInAreaFlag = CheckPlayerInRange(Config.Cleanup.Proximity.Escape)
+            else
+                playersInAreaFlag = CheckPlayerInRange(Config.Cleanup.Proximity.DeadBody, legendaryDeathCoords)
             end
             
-            -- Decrement timers based on conditions
+            -- Decrement timers based on state
             if livingFlag and not playersInAreaFlag then
                 liveAbandonmentTimer = liveAbandonmentTimer - monitorInterval
             end
             
             if not livingFlag then
-                if not playersInAreaFlag then
-                    deadAbandonmentTimer = deadAbandonmentTimer - monitorInterval
-                else
-                    deadNonAbandonmentTimer = deadNonAbandonmentTimer - monitorInterval
-                end
+                deathTimer = deathTimer - monitorInterval
             end
             
             maxMissionTimer = maxMissionTimer - monitorInterval
@@ -129,14 +104,21 @@ function StartCleanupMonitor(animalData)
                 missionActive = false
             end
             
-            if deadAbandonmentTimer <= 0 then
-                triggerReason = "dead_abandoned"
+            if deathTimer <= 0 and not livingFlag then
+                triggerReason = "dead_expired"
                 missionActive = false
             end
             
-            if deadNonAbandonmentTimer <= 0 then
-                triggerReason = "dead_expiry"
-                missionActive = false
+            if not livingFlag and legendaryDeathCoords then
+                local playerPed = PlayerPedId()
+                if DoesEntityExist(playerPed) then
+                    local playerCoords = GetEntityCoords(playerPed)
+                    local distance = #(playerCoords - legendaryDeathCoords)
+                    if distance > 200 then
+                        triggerReason = "player_left_death_area"
+                        missionActive = false
+                    end
+                end
             end
             
             if maxMissionTimer <= 0 then
@@ -149,8 +131,8 @@ function StartCleanupMonitor(animalData)
             if Config.CleanupDebugMode and (now - lastDebugPrint) > debugPrintInterval then
                 lastDebugPrint = now
                 print("Living: " .. tostring(livingFlag) .. " | PlayersInArea: " .. tostring(playersInAreaFlag) ..
-                      " | LAT: " .. string.format("%.1f", liveAbandonmentTimer / 1000) .. "s | DAT: " .. string.format("%.1f", deadAbandonmentTimer / 1000) .. "s | " ..
-                      "DNAT: " .. string.format("%.1f", deadNonAbandonmentTimer / 1000) .. "s | MMT: " .. string.format("%.1f", maxMissionTimer / 1000) .. "s")
+                      " | LAT: " .. string.format("%.1f", liveAbandonmentTimer / 1000) .. "s | DT: " .. string.format("%.1f", deathTimer / 1000) .. "s | " ..
+                      "MMT: " .. string.format("%.1f", maxMissionTimer / 1000) .. "s")
             end
         end
         

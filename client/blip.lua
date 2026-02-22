@@ -13,7 +13,7 @@ local entityHasBlip = {}
 RegisterNetEvent('nt_legendary:attachBlipToEntity')
 AddEventHandler('nt_legendary:attachBlipToEntity', function(animalName, netId)
     -- Try to resolve the network ID robustly
-    Citizen.CreateThread(function()
+    CreateThread(function()
         local attempts = 0
         local maxAttempts = 120 -- up to ~60s if 500ms per attempt
         local entity = 0
@@ -132,7 +132,7 @@ function StartBlipMonitorThread(animalName, entityId)
         LegendaryNotify()
     end
     
-    Citizen.CreateThread(function()
+    CreateThread(function()
         local blinkState = true -- Start with blip visible
         local lastToggleTime = 0
         local currentInterval = Config.BlipVisibleRate -- Start with visible interval

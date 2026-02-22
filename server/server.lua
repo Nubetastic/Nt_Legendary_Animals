@@ -103,7 +103,7 @@ AddEventHandler('nt_legendary:animalEscaped', function(animalName)
 end)
 
 -- Function to clean up expired cooldowns (run periodically)
-Citizen.CreateThread(function()
+CreateThread(function()
     while true do
         Wait(60000) -- Check every minute
         
@@ -139,17 +139,9 @@ AddEventHandler('nt_legendary:getServerWeather', function()
     local source = source
     
     -- FALLBACK: Use pcall to safely call the export and handle any errors
-    local success, currentWeather = pcall(function()
-        return exports["weathersync"]:getWeather()
-    end)
-    
-    -- FALLBACK: If the export call failed or returned nil, use a default weather
-    if not success or not currentWeather then
-        if Config.DebugMode then
-            print("ERROR: Failed to get weather from weathersync export. Using fallback weather.")
-        end
-        currentWeather = "clear" -- Default fallback weather
-    end
+    local currentWeather =  exports["weathersync"]:getWeather(source)
+
+
     
     -- Send the weather back to the requesting client
     TriggerClientEvent('nt_legendary:receiveServerWeather', source, currentWeather)

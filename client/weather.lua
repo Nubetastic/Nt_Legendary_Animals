@@ -72,7 +72,7 @@ function UpdateCurrentWeather()
     weatherUpdateInProgress = true
     
     -- FALLBACK: Set a timeout to reset the flag in case the server never responds
-    Citizen.CreateThread(function()
+    CreateThread(function()
         Wait(10000) -- 10 second timeout
         if weatherUpdateInProgress then
             weatherUpdateInProgress = false
@@ -111,7 +111,7 @@ function IsPreferredWeather(animalData)
 end
 
 -- Initialize weather tracking
-Citizen.CreateThread(function()
+CreateThread(function()
     while true do
         Wait(60000) -- Update every minute
         UpdateCurrentWeather()
@@ -119,7 +119,7 @@ Citizen.CreateThread(function()
 end)
 
 -- Initial weather update - reduced delay to get weather faster
-Citizen.CreateThread(function()
+CreateThread(function()
     Wait(1000) -- Short delay to ensure weathersync is initialized
     UpdateCurrentWeather()
 end)

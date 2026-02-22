@@ -11,7 +11,7 @@ localCooldowns = {} -- Table to track local cooldowns for specific animals
 globalCooldown = 0 -- Cooldown for all legendary animals
 
 -- Initialize the script
-Citizen.CreateThread(function()
+CreateThread(function()
     -- Wait for player to fully load
     Wait(2000)
     
@@ -35,7 +35,7 @@ Citizen.CreateThread(function()
 end)
 
 -- Main loop to check for legendary animal spawn areas
-Citizen.CreateThread(function()
+CreateThread(function()
     -- Wait for full initialization
     Wait(5000)
     

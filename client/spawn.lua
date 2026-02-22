@@ -282,7 +282,7 @@ AddEventHandler('onResourceStop', function(resourceName)
 end)
 
 -- Request active legendary animals when client starts
-Citizen.CreateThread(function()
+CreateThread(function()
     -- Wait for player to fully load
     Wait(5000)
     
